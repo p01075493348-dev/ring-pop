@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>RING POP! 2 — 타이밍 + 이벤트 아케이드</title>
+<style>
+  :root{
+    --bg-deep:#12071F;
+    --bg-glow:#2B1055;
+    --ring-track:#3A2A5E;
+    --zone:#FFC93C;
+    --marker:#FF4D8D;
+    --cyan:#41E2BA;
+    --purple:#B388FF;
+    --danger:#FF3B3B;
+    --text:#F5EFFF;
+    --dim:#9B8CC4;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:radial-gradient(ellipse at 50% 30%, var(--bg-glow) 0%, var(--bg-deep) 70%);
+    font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Noto Sans KR",sans-serif;
+    color:var(--text);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    user-select:none;-webkit-user-select:none;touch-action:manipulation;
+  }
+  #hud{
+    position:fixed;top:0;left:0;right:0;
+    display:flex;justify-content:space-between;align-items:flex-start;
+    padding:20px 24px;pointer-events:none;z-index:2;
+  }
+  .stat{text-align:center}
+  .stat .label{font-size:11px;letter-spacing:2px;color:var(--dim);font-weight:600}
+  .stat .value{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
+  #best .value{color:var(--zone)}
+
+  #event-banner{
+    position:fixed;top:14%;left:0;right:0;text-align:center;pointer-events:none;z-index:2;
+    opacity:0;transform:translateY(-8px);transition:opacity .2s,transform .2s;
+  }
+  #event-banner.show{opacity:1;transform:translateY(0)}
+  #event-name{
+    display:inline-block;font-size:20px;font-weight:900;letter-spacing:2px;
+    padding:8px 22px;border-radius:100px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
+  }
+  #event-desc{margin-top:8px;font-size:12.5px;color:var(--dim);letter-spacing:.5px}
+
+  #combo-wrap{
+    position:fixed;top:24%;left:0;right:0;text-align:center;pointer-events:none;
+    opacity:0;transition:opacity .15s;z-index:2;
+  }
+  #combo-wrap.show{opacity:1}
+  #combo-num{
+    font-size:50px;font-weight:900;line-height:1;
+    background:linear-gradient(135deg,var(--marker),var(--zone));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  #combo-label{font-size:11px;letter-spacing:4px;color:var(--dim);font-weight:700}
+
+  #judge{
+    position:fixed;top:33%;left:0;right:0;text-align:center;pointer-events:none;z-index:2;
+    font-size:24px;font-weight:900;letter-spacing:2px;opacity:0;transform:scale(.6);
+  }
+  #judge.pop{animation:judgePop .5s ease-out}
+  @keyframes judgePop{
+    0%{opacity:0;transform:scale(.6)}
+    25%{opacity:1;transform:scale(1.15)}
+    60%{opacity:1;transform:scale(1)}
+    100%{opacity:0;transform:scale(1)}
+  }
+
+  canvas{display:block;cursor:pointer}
+  #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:3}
+
+  #overlay{
+    position:fixed;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;
+    background:rgba(18,7,31,.85);backdrop-filter:blur(6px);
+    transition:opacity .25s;padding:24px;z-index:4;
+  }
+  #overlay.hidden{opacity:0;pointer-events:none}
+  #overlay h1{
+    font-size:48px;font-weight:900;letter-spacing:-1px;line-height:1.05;
+    background:linear-gradient(135deg,var(--marker) 20%,var(--zone) 80%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    margin-bottom:12px;
+  }
+  #death-reason{font-size:13px;font-weight:700;letter-spacing:1px;color:var(--danger);margin-bottom:10px;display:none}
+  #final-score{font-size:14px;color:var(--dim);margin-bottom:6px;display:none}
+  #final-score b{font-size:34px;color:var(--text);display:block;font-variant-numeric:tabular-nums}
+  #new-best{
+    display:none;font-size:13px;font-weight:800;letter-spacing:2px;color:var(--zone);
+    margin-bottom:16px;animation:blink 1s infinite;
+  }
+  @keyframes blink{50%{opacity:.35}}
+  #overlay .sub{color:var(--dim);font-size:14px;line-height:1.8;margin-bottom:26px;max-width:340px}
+  #overlay .sub strong{color:var(--text)}
+  .ev-chip{
+    display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;
+    padding:3px 10px;margin:2px;border-radius:100px;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
+  }
+  #start-btn{
+    pointer-events:auto;border:none;cursor:pointer;
+    font-family:inherit;font-size:17px;font-weight:800;letter-spacing:1px;
+    color:#12071F;background:linear-gradient(135deg,var(--zone),#FF9F1C);
+    padding:16px 52px;border-radius:100px;
+    box-shadow:0 6px 30px rgba(255,201,60,.35);transition:transform .1s;
+  }
+  #start-btn:active{transform:scale(.94)}
+  .hint{position:fixed;bottom:24px;left:0;right:0;text-align:center;font-size:12px;color:var(--dim);letter-spacing:1px;pointer-events:none}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="stat"><div class="label">SCORE</div><div class="value" id="score">0</div></div>
+  <div class="stat" id="best"><div class="label">BEST</div><div class="value" id="best-val">0</div></div>
+</div>
+
+<div id="event-banner"><span id="event-name"></span><div id="event-desc"></div></div>
+<div id="combo-wrap"><div id="combo-num">0</div><div id="combo-label">COMBO</div></div>
+<div id="judge"></div>
+
+<canvas id="game"></canvas>
+<div id="flash"></div>
+
+<div id="overlay">
+  <h1>RING POP! 2</h1>
+  <div id="death-reason"></div>
+  <div id="final-score">SCORE<b id="final-num">0</b></div>
+  <div id="new-best">★ NEW BEST ★</div>
+  <div class="sub" id="overlay-sub">
+    노란 존에서 탭! 단, <strong>2바퀴 안에</strong> 못 누르면 탈락.<br>
+    존 크기는 매 턴 랜덤. 그리고 가끔, 이런 일이 벌어집니다:<br><br>
+    <span class="ev-chip" style="color:#FFC93C">🌈 FEVER</span>
+    <span class="ev-chip" style="color:#41E2BA">🐌 SLOW</span>
+    <span class="ev-chip" style="color:#B388FF">✕2 DOUBLE</span>
+    <span class="ev-chip" style="color:#FF3B3B">💀 TRAP</span>
+    <span class="ev-chip">👻 GHOST</span>
+    <span class="ev-chip">🌀 CHAOS</span>
+    <span class="ev-chip">🫥 BLACKOUT</span>
+    <span class="ev-chip">📉 SHRINK</span>
+    <span class="ev-chip">🎯 MOVING</span>
+  </div>
+  <button id="start-btn">탭해서 시작</button>
+</div>
+
+<div class="hint">화면 아무 곳이나 탭 · 스페이스바 OK</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const TAU = Math.PI * 2;
+
+  let W, H, R, cx, cy, dpr;
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    R = Math.min(W, H) * 0.32;
+    cx = W / 2; cy = H / 2;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ================= 이벤트 정의 =================
+  const EVENTS = {
+    NONE:    { name:'', desc:'', color:'#FFC93C', weight:0 },
+    FEVER:   { name:'🌈 FEVER TIME', desc:'지금은 어디를 눌러도 성공! 보너스 +10', color:'rainbow', weight:10 },
+    SLOW:    { name:'🐌 SLOW ZONE', desc:'청록 존을 맞추면 3턴 동안 속도 감소', color:'#41E2BA', weight:14 },
+    DOUBLE:  { name:'✕2 DOUBLE', desc:'보라 존! 이번 턴 점수 2배', color:'#B388FF', weight:16 },
+    TRAP:    { name:'💀 TRAP', desc:'바늘이 빨간 함정에 닿기 전에 존을 눌러라!', color:'#FFC93C', weight:12 },
+    GHOST:   { name:'👻 GHOST', desc:'존이 깜빡이며 사라진다. 위치를 기억해!', color:'#FFC93C', weight:12 },
+    CHAOS:   { name:'🌀 CHAOS', desc:'바늘이 예측불가로 방향을 바꾼다', color:'#FFC93C', weight:11 },
+    BLACKOUT:{ name:'🫥 BLACKOUT', desc:'바늘이 주기적으로 투명해진다', color:'#FFC93C', weight:11 },
+    SHRINK:  { name:'📉 SHRINK', desc:'존이 계속 줄어든다. 빨리 눌러!', color:'#FFC93C', weight:12 },
+    MOVING:  { name:'🎯 MOVING', desc:'존이 도망다닌다', color:'#FFC93C', weight:12 },
+  };
+
+  // ================= 상태 =================
+  const S = {
+    playing:false,
+    angle:-Math.PI/2, dir:1,
+    baseSpeed:2.2,
+    zoneCenter:0, zoneHalf:0.5,
+    score:0, best:0, combo:0, level:0,
+    // 바퀴 제한
+    turnRot:0, lapLimit:2 * TAU,
+    // 이벤트
+    event:'NONE', eventT:0,
+    slowTurns:0,
+    trapCenter:0, trapHalf:0.34,
+    moveDir:1, chaosTimer:0,
+    particles:[], shake:0, ringPulse:0, feverHue:0,
+  };
+
+  function angDist(a,b){
+    let d = Math.abs(a-b) % TAU;
+    return d > Math.PI ? TAU - d : d;
+  }
+  function aheadOf(base, offset){ // 진행방향 기준 offset만큼 앞
+    return ((base + S.dir * offset) % TAU + TAU) % TAU;
+  }
+
+  function currentSpeed(){
+    let sp = S.baseSpeed;
+    if (S.slowTurns > 0) sp *= 0.55;
+    return sp;
+  }
+
+  // ================= 턴 시작 =================
+  function newTurn(){
+    S.turnRot = 0;
+    S.eventT = 0;
+    S.level++;
+
+    // 난이도 곡선
+    S.baseSpeed = Math.min(2.2 + S.level * 0.16, 7.2);
+    const baseHalf = Math.max(0.5 - S.level * 0.014, 0.17);
+    // 존 크기 랜덤 (±35%)
+    S.zoneHalf = baseHalf * (0.7 + Math.random() * 0.65);
+
+    // 방향 랜덤 반전
+    if (S.level >= 5 && Math.random() < 0.3) S.dir *= -1;
+
+    // 이벤트 추첨 (레벨 3부터, 확률 점증)
+    S.event = 'NONE';
+    const evChance = S.level < 3 ? 0 : Math.min(0.25 + S.level * 0.015, 0.5);
+    if (Math.random() < evChance){
+      const pool = Object.entries(EVENTS).filter(([k,v]) => v.weight > 0);
+      const total = pool.reduce((s,[,v]) => s + v.weight, 0);
+      let r = Math.random() * total;
+      for (const [k,v] of pool){ r -= v.weight; if (r <= 0){ S.event = k; break; } }
+    }
+
+    // 존 배치
+    if (S.event === 'TRAP'){
+      // 진행방향 앞쪽에 존, 그 뒤에 함정 — 첫 접근에 무조건 눌러야 함
+      S.zoneCenter = aheadOf(S.angle, 1.1 + Math.random() * 0.5);
+      S.trapCenter = aheadOf(S.angle, 2.6 + Math.random() * 0.5);
+      S.zoneHalf = Math.max(S.zoneHalf, 0.3); // 함정 턴은 최소 크기 보장
+    } else if (S.event === 'FEVER'){
+      S.zoneCenter = 0; // 의미 없음(전체 성공)
+    } else {
+      let a;
+      do { a = Math.random() * TAU; } while (angDist(a, S.angle) < Math.PI/2);
+      S.zoneCenter = a;
+      if (S.event === 'SHRINK') S.zoneHalf = Math.max(S.zoneHalf * 1.6, 0.55); // 크게 시작해서 줄어듦
+      if (S.event === 'GHOST' || S.event === 'MOVING') S.zoneHalf = Math.max(S.zoneHalf, 0.28);
+      if (S.event === 'MOVING') S.moveDir = Math.random() < .5 ? 1 : -1;
+    }
+    S.chaosTimer = 0.6;
+
+    // 배너
+    const b = $('event-banner');
+    if (S.event !== 'NONE'){
+      $('event-name').textContent = EVENTS[S.event].name;
+      $('event-desc').textContent = EVENTS[S.event].desc;
+      b.classList.add('show');
+    } else {
+      b.classList.remove('show');
+    }
+  }
+
+  // ================= 게임 흐름 =================
+  function startGame(){
+    S.playing = true;
+    S.score = 0; S.combo = 0; S.level = 0;
+    S.dir = 1; S.angle = -Math.PI/2;
+    S.slowTurns = 0; S.particles.length = 0;
+    newTurn();
+    $('score').textContent = '0';
+    $('combo-wrap').classList.remove('show');
+    $('overlay').classList.add('hidden');
+    last = performance.now();
+  }
+
+  function endGame(reason){
+    S.playing = false;
+    S.shake = 16;
+    $('event-banner').classList.remove('show');
+    $('death-reason').textContent = reason;
+    $('death-reason').style.display = 'block';
+    $('final-num').textContent = S.score;
+    $('final-score').style.display = 'block';
+    const isBest = S.score > S.best;
+    if (isBest) S.best = S.score;
+    $('best-val').textContent = S.best;
+    $('new-best').style.display = isBest && S.score > 0 ? 'block' : 'none';
+    $('overlay-sub').innerHTML = '다시 하면 더 잘할 수 있을 것 같은데요.';
+    $('start-btn').textContent = '한 판 더';
+    setTimeout(() => $('overlay').classList.remove('hidden'), 380);
+  }
+
+  function tap(){
+    if (!S.playing) return;
+
+    // FEVER: 무조건 성공
+    if (S.event === 'FEVER'){
+      succeed(true, 10);
+      return;
+    }
+    // TRAP 존 안에서 탭 → 즉사
+    if (S.event === 'TRAP' && angDist(S.angle, S.trapCenter) <= S.trapHalf){
+      endGame('💀 함정을 눌렀다');
+      return;
+    }
+    const d = angDist(S.angle, S.zoneCenter);
+    if (d <= S.zoneHalf){
+      succeed(d <= S.zoneHalf * 0.35, 0);
+    } else {
+      endGame('존을 벗어났다');
+    }
+  }
+
+  function succeed(perfect, flatBonus){
+    S.combo++;
+    if (S.slowTurns > 0) S.slowTurns--;
+
+    let gain = (perfect ? 3 : 1) * (1 + Math.floor(S.combo / 5)) + flatBonus;
+    if (S.event === 'DOUBLE') gain *= 2;
+    if (S.event === 'SLOW') S.slowTurns = 3;
+    S.score += gain;
+
+    showJudge(
+      S.event === 'FEVER' ? 'FEVER! +' + gain :
+      S.event === 'DOUBLE' ? '✕2! +' + gain :
+      S.event === 'SLOW' ? 'SLOW ON!' :
+      perfect ? 'PERFECT!' : 'GOOD',
+      perfect || S.event !== 'NONE'
+    );
+    burst(perfect ? 26 : 14, perfect);
+    S.ringPulse = 1;
+    if (perfect || S.event === 'FEVER') flash();
+    $('score').textContent = S.score;
+    if (S.combo >= 2){
+      $('combo-num').textContent = S.combo;
+      $('combo-wrap').classList.add('show');
+    }
+    newTurn();
+  }
+
+  function showJudge(txt, hot){
+    const j = $('judge');
+    j.textContent = txt;
+    j.style.color = hot ? 'var(--zone)' : 'var(--cyan)';
+    j.classList.remove('pop'); void j.offsetWidth; j.classList.add('pop');
+  }
+  function flash(){
+    const f = $('flash');
+    f.style.transition = 'none'; f.style.opacity = .32;
+    requestAnimationFrame(() => { f.style.transition = 'opacity .3s'; f.style.opacity = 0; });
+  }
+  function burst(n, perfect){
+    const base = S.event === 'FEVER' ? S.angle : S.zoneCenter;
+    const px = cx + Math.cos(base) * R;
+    const py = cy + Math.sin(base) * R;
+    for (let i = 0; i < n; i++){
+      const a = Math.random() * TAU;
+      const v = 2 + Math.random() * (perfect ? 6 : 3.5);
+      S.particles.push({
+        x:px, y:py, vx:Math.cos(a)*v, vy:Math.sin(a)*v,
+        life:1, size:2 + Math.random()*3,
+        color: perfect ? (Math.random()<.5?'#FFC93C':'#FF4D8D') : '#41E2BA',
+      });
+    }
+  }
+
+  // ================= 루프 =================
+  let last = performance.now();
+  function frame(now){
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+
+    if (S.playing){
+      S.eventT += dt;
+
+      // CHAOS: 무작위 방향 전환
+      if (S.event === 'CHAOS'){
+        S.chaosTimer -= dt;
+        if (S.chaosTimer <= 0){
+          S.dir *= -1;
+          S.chaosTimer = 0.5 + Math.random() * 0.7;
+        }
+      }
+      // MOVING: 존 이동
+      if (S.event === 'MOVING'){
+        S.zoneCenter = ((S.zoneCenter + S.moveDir * 0.55 * dt) % TAU + TAU) % TAU;
+      }
+      // SHRINK: 존 축소
+      if (S.event === 'SHRINK'){
+        S.zoneHalf = Math.max(S.zoneHalf - 0.13 * dt, 0.07);
+      }
+
+      const sp = currentSpeed();
+      S.angle = ((S.angle + S.dir * sp * dt) % TAU + TAU) % TAU;
+      S.turnRot += sp * dt;
+
+      // 2바퀴 초과 → 탈락
+      if (S.turnRot >= S.lapLimit){
+        endGame('⏱ 2바퀴 안에 못 눌렀다');
+      }
+      // TRAP: 바늘이 함정 통과 → 탈락
+      if (S.playing && S.event === 'TRAP' && angDist(S.angle, S.trapCenter) <= S.trapHalf * 0.6 && S.turnRot > 0.3){
+        endGame('💀 바늘이 함정에 빠졌다');
+      }
+    }
+
+    // ---------- 렌더 ----------
+    ctx.clearRect(0, 0, W, H);
+    let ox = 0, oy = 0;
+    if (S.shake > 0){
+      ox = (Math.random()-.5) * S.shake; oy = (Math.random()-.5) * S.shake;
+      S.shake *= 0.86; if (S.shake < .5) S.shake = 0;
+    }
+    ctx.save(); ctx.translate(ox, oy);
+
+    const pulse = S.ringPulse; S.ringPulse *= 0.9;
+    const rr = R * (1 + pulse * 0.045);
+
+    // 트랙
+    ctx.beginPath(); ctx.arc(cx, cy, rr, 0, TAU);
+    ctx.strokeStyle = '#3A2A5E';
+    ctx.lineWidth = 14; ctx.lineCap = 'round'; ctx.stroke();
+
+    // ----- 존 렌더 -----
+    if (S.event === 'FEVER'){
+      // 무지개 전체 링
+      S.feverHue = (S.feverHue + dt * 160) % 360;
+      for (let i = 0; i < 24; i++){
+        const a0 = (i / 24) * TAU, a1 = ((i + 1) / 24) * TAU + 0.02;
+        ctx.beginPath(); ctx.arc(cx, cy, rr, a0, a1);
+        ctx.strokeStyle = `hsl(${(S.feverHue + i * 15) % 360},90%,60%)`;
+        ctx.lineWidth = 14; ctx.stroke();
+      }
+    } else {
+      let zoneAlpha = 1;
+      if (S.event === 'GHOST'){
+        // 1.4초 주기로 사라졌다 나타남
+        const ph = (S.eventT % 1.4) / 1.4;
+        zoneAlpha = ph < 0.55 ? 1 : Math.max(0, 1 - (ph - 0.55) * 6);
+      }
+      const zColor = S.event === 'SLOW' ? '#41E2BA' : S.event === 'DOUBLE' ? '#B388FF' : '#FFC93C';
+      ctx.globalAlpha = zoneAlpha;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rr, S.zoneCenter - S.zoneHalf, S.zoneCenter + S.zoneHalf);
+      ctx.strokeStyle = zColor; ctx.lineWidth = 14;
+      ctx.shadowColor = zColor; ctx.shadowBlur = 18 + pulse * 22;
+      ctx.stroke(); ctx.shadowBlur = 0;
+      // 퍼펙트 스팟
+      ctx.beginPath();
+      ctx.arc(cx, cy, rr, S.zoneCenter - S.zoneHalf*0.35, S.zoneCenter + S.zoneHalf*0.35);
+      ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 6; ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // TRAP 존
+      if (S.event === 'TRAP'){
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr, S.trapCenter - S.trapHalf, S.trapCenter + S.trapHalf);
+        ctx.strokeStyle = '#FF3B3B'; ctx.lineWidth = 14;
+        ctx.shadowColor = '#FF3B3B'; ctx.shadowBlur = 20;
+        ctx.stroke(); ctx.shadowBlur = 0;
+        // 해골 표시
+        const tx = cx + Math.cos(S.trapCenter) * (rr + 30);
+        const ty = cy + Math.sin(S.trapCenter) * (rr + 30);
+        ctx.font = '16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('💀', tx, ty);
+      }
+    }
+
+    // ----- 바늘 -----
+    let markerAlpha = 1;
+    if (S.event === 'BLACKOUT'){
+      const ph = (S.eventT % 1.6) / 1.6;
+      markerAlpha = ph < 0.5 ? 1 : 0.06;
+    }
+    const mx = cx + Math.cos(S.angle) * rr;
+    const my = cy + Math.sin(S.angle) * rr;
+    ctx.globalAlpha = markerAlpha;
+    ctx.beginPath(); ctx.arc(mx, my, 13, 0, TAU);
+    ctx.fillStyle = '#FF4D8D';
+    ctx.shadowColor = '#FF4D8D'; ctx.shadowBlur = 24; ctx.fill(); ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.arc(mx, my, 5.5, 0, TAU);
+    ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // ----- 중앙: 바퀴 타이머 + 레벨 -----
+    if (S.playing){
+      const remain = 1 - S.turnRot / S.lapLimit; // 1 → 0
+      const tR = R * 0.42;
+      ctx.beginPath(); ctx.arc(cx, cy, tR, 0, TAU);
+      ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 6; ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy, tR, -Math.PI/2, -Math.PI/2 + remain * TAU);
+      ctx.strokeStyle = remain > 0.5 ? '#41E2BA' : remain > 0.25 ? '#FFC93C' : '#FF3B3B';
+      ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.stroke();
+
+      ctx.font = '800 15px -apple-system, sans-serif';
+      ctx.fillStyle = 'rgba(155,140,196,.9)';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('LV ' + S.level, cx, cy - 10);
+      if (S.slowTurns > 0){
+        ctx.font = '700 12px -apple-system, sans-serif';
+        ctx.fillStyle = '#41E2BA';
+        ctx.fillText('🐌 ' + S.slowTurns, cx, cy + 12);
+      }
+    }
+
+    // ----- 파티클 -----
+    for (let i = S.particles.length - 1; i >= 0; i--){
+      const p = S.particles[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.12;
+      p.vx *= 0.985; p.vy *= 0.985;
+      p.life -= 0.022;
+      if (p.life <= 0){ S.particles.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.max(p.life, 0);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ================= 입력 =================
+  window.addEventListener('pointerdown', e => {
+    if (!S.playing) return;
+    e.preventDefault();
+    tap();
+  });
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space'){
+      e.preventDefault();
+      if (S.playing) tap();
+      else startGame();
+    }
+  });
+  document.getElementById('start-btn').addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    startGame();
+  });
+})();
+</script>
+</body>
+</html>
